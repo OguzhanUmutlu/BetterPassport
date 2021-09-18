@@ -7,7 +7,7 @@ let id = 0;
 
 module.exports.callback = (req, res, next) => {
     const token = cookie.parse(req.headers.cookie || '')["cli.id"];
-    const session = sessions[tokens[token] || -1];
+    const session = sessions[tokens[token] || tokens[token] === 0 ? tokens[token] : -1];
     console.log(token, tokens, sessions)
     if (!session) return next();
     req.user = session;
@@ -15,9 +15,9 @@ module.exports.callback = (req, res, next) => {
 }
 
 module.exports.Session = class Session {
-    constructor(value, token = null) {
+    constructor(user, token = null) {
         this.id = id++;
-        this.value = value;
+        this.user = user;
         this.token = token;
     }
 
@@ -27,7 +27,7 @@ module.exports.Session = class Session {
 }
 
 module.exports.createSession = (req, res, session, redirect = "/") => {
-    if (!(session instanceof module.exports.Session)) return false;
+    if (!(session instanceof module.exports.Session) || !session.user) return false;
     const token = session.token || generateToken();
     tokens[token] = session.id;
     sessions[session.id] = session;
