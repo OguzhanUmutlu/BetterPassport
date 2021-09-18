@@ -8,7 +8,6 @@ let id = 0;
 module.exports.callback = (req, res, next) => {
     const token = cookie.parse(req.headers.cookie || '')["cli.id"];
     const session = sessions[tokens[token] || tokens[token] === 0 ? tokens[token] : -1];
-    console.log(token, tokens, sessions)
     if (!session) return next();
     req.user = session;
     return next();
