@@ -1,6 +1,3 @@
-const fetch = require("node-fetch");
-const fs = require("fs");
-const cookie = require("cookie");
 const randoms = "abcdefghijklmnoprstuvyzqwx!'^+%&/()=?_1234567890".split("");
 const generateToken = () => " ".repeat(50).toString().split("").map(() => randoms[Math.floor(Math.random() * randoms.length)]).join("");
 
@@ -9,7 +6,8 @@ class Passport {
      * @param {
      *  {
      *   config: boolean,
-     *   configFile: string
+     *   configFile: string,
+     *   configType?: string
      *  }
      * } options
      */
@@ -17,15 +15,44 @@ class Passport {
         config: true,
         configFile: "./data.json"
     }) {
+        this.init(options).then(r => r);
+    }
+
+    async init(options) {
+        this.fs = await import("fs");
+        this.fetch = await import("node-fetch");
+        this.cookie = await import("cookie");
         this._config = options.config;
         this._configFile = options.configFile;
+        this._configType = options.configType || "json";
         if (this._config) {
-            if (!fs.existsSync(this._configFile)) fs.writeFileSync(this._configFile, "{}");
-            this._json = JSON.parse(fs.readFileSync(this._configFile).toString());
+            switch (this._configType) {
+                case "json":
+                    if (!this.fs.existsSync(this._configFile)) this.fs.writeFileSync(this._configFile, "{}");
+                    this._json = JSON.parse(this.fs.readFileSync(this._configFile).toString());
+                    break;
+                case "sqlite":
+                case "sql":
+                    this._sqlite = require("better-sqlite3")(this._configFile);
+                    this._sqlite.exec(`CREATE TABLE IF NOT EXISTS tokens
+                                       (
+                                           token TEXT PRIMARY KEY NOT NULL,
+                                           data  TEXT             NOT NULL
+                                       )`);
+                    break;
+            }
         }
     }
 
     getTokens() {
+        if(this._sqlite) {
+            const res = {};
+            this._sqlite.prepare(`SELECT * FROM tokens`).all().forEach(row => res[row.token] = {
+                token: row.token,
+                data: JSON.parse(row.data)
+            });
+            return res;
+        }
         return this._json;
     }
 
@@ -33,8 +60,8 @@ class Passport {
      * @internal - This is an internal function.
      */
     save() {
-        if (!this._config) return this;
-        fs.writeFileSync(this._configFile, JSON.stringify(this.getTokens()));
+        if (!this._config || this._sqlite) return this;
+        this.fs.writeFileSync(this._configFile, JSON.stringify(this.getTokens()));
     }
 
     /**
@@ -42,7 +69,9 @@ class Passport {
      * @returns {
      *  {
      *   token: string,
-     *   userId: number
+     *   data: {
+     *       id: number
+     *   }
      *  } | null
      * }
      *
@@ -57,13 +86,18 @@ class Passport {
      * @param {
      *  {
      *   token: string,
-     *   userId: number
+     *   id: number
      *  }
      * } value
      *
      * @internal - This is an internal function.
      */
     setToken(token, value) {
+        if(this._sqlite) {
+            if(this.getToken(token)) this.removeToken(token);
+            this._sqlite.prepare(`INSERT INTO tokens (token, data) VALUES (?, ?)`).run(token, JSON.stringify(value));
+            return this;
+        }
         this._json[token] = value;
         this.save();
         return this;
@@ -75,6 +109,11 @@ class Passport {
      * @internal - This is an internal function.
      */
     removeToken(token) {
+        if(this._sqlite) {
+            if(this.getToken(token)) this.removeToken(token);
+            this._sqlite.prepare(`DELETE FROM tokens WHERE token = ?`).run(token);
+            return this;
+        }
         delete this._json[token];
         this.save();
         return this;
@@ -115,8 +154,13 @@ class Passport {
         while (!token || this.getToken(token)) {
             token = generateToken();
         }
-        this.setToken(token, {token, userId});
-        res.setHeader('Set-Cookie', cookie.serialize("cli.id", token, {
+        this.setToken(token, {token, id: userId});
+        this.setTokenCookie(req, res, "cli.id", token, redirect);
+        return this;
+    }
+
+    setTokenCookie(req, res, sub, token, redirect = "/") {
+        res.setHeader('Set-Cookie', this.cookie.serialize(sub, token, {
             httpOnly: true,
             maxAge: 60 * 60 * 24 * 7
         }));
@@ -151,7 +195,6 @@ class Passport {
     removeSession(req) {
         if (!req.user.token) return false;
         const res = this.getToken(req.user.token);
-        if (this._logoutCallback) this._logoutCallback(req);
         this.removeToken(req.user.token);
         delete req.user;
         return res !== null;
@@ -166,7 +209,7 @@ class Passport {
      * is same with your parameter.
      * */
     getTokensByUserId(userId) {
-        return Object.values(this.getTokens()).filter(token => token.userId === userId).map(i => i.token);
+        return Object.values(this.getTokens()).filter(token => token.data.id === userId).map(i => i.token);
     }
 
     /**
@@ -174,7 +217,7 @@ class Passport {
      *
      * @returns {this}
      *
-     * @description Passport runs it with parameter `userId`
+     * @description Passport runs it with parameter `id`
      * which is a number that they set it while making user
      * logged in. The returned value will be replaced with
      * `req.user.data`.
@@ -186,40 +229,6 @@ class Passport {
      * */
     setUserCallback(callback) {
         this._userCallback = callback;
-        return this;
-    }
-
-    /**
-     * @param {function} callback
-     *
-     * @description Passport runs it with parameter `Request`
-     * which they can set and change things everytime when
-     * a user logins.
-     *
-     * @example
-     * const Passport = require("./Passport");
-     * const passport = new Passport();
-     * passport.setLoginCallback((req) => console.log("User #" + req.user.id + " logged in!"))
-     * */
-    setLoginCallback(callback) {
-        this._loginCallback = callback;
-        return this;
-    }
-
-    /**
-     * @param {function} callback
-     *
-     * @description Passport runs it with parameter `Request`
-     * which they can set and change things everytime when
-     * a user logs out.
-     *
-     * @example
-     * const Passport = require("./Passport");
-     * const passport = new Passport();
-     * passport.setLogoutCallback((req) => console.log("User #" + req.user.id + " logged out!"))
-     * */
-    setLogoutCallback(callback) {
-        this._logoutCallback = callback;
         return this;
     }
 
@@ -240,15 +249,19 @@ class Passport {
      */
     callback = (req, res, next) => {
         req.user = {};
-        req.user.isAuthenticated = () => req.authenticated;
-        const token = cookie.parse(req.headers.cookie || '')["cli.id"];
+        req.user.isAuthenticated = () => req.user.authenticated;
+        const token = this.cookie.parse(req.headers.cookie || '')["cli.id"];
         const data = this.getToken(token);
-        if (!data) return next();
+        console.log(data)
+        if (!data) {
+            console.log(req)
+            return next();
+        }
         req.user.token = token;
-        req.user.id = data["id"];
+        req.user.id = data["data"].id;
         req.user.authenticated = true;
+        console.log(req.user)
         if (this._userCallback) req.user.data = this._userCallback(req.user.id);
-        if (this._loginCallback) this._loginCallback(req);
         return next();
     }
     /**
@@ -285,6 +298,11 @@ class DiscordPassport extends Passport {
      * @internal - This is an internal function.
      */
     setToken(token, value) {
+        if(this._sqlite) {
+            if(this.getToken(token)) this.removeToken(token);
+            this._sqlite.prepare(`INSERT INTO tokens (token, data) VALUES (?, ?)`).run(token, JSON.stringify(value));
+            return this;
+        }
         this._json[token] = value;
         this.save();
         return this;
@@ -304,13 +322,7 @@ class DiscordPassport extends Passport {
             token = this.generateToken();
         }
         this.setToken(token, {token, data});
-        res.setHeader('Set-Cookie', cookie.serialize("cli.id.discord", token, {
-            httpOnly: true,
-            maxAge: 60 * 60 * 24 * 7
-        }));
-        res.statusCode = 302;
-        res.setHeader('Location', redirectURL);
-        res.end();
+        this.setTokenCookie(req, res, "cli.id.discord", token, redirectURL);
         return this;
     }
 
@@ -362,40 +374,6 @@ class DiscordPassport extends Passport {
     }
 
     /**
-     * @param {function} callback
-     *
-     * @description Passport runs it with parameter `Request`
-     * which they can set and change things everytime when
-     * a user logins.
-     *
-     * @example
-     * const Passport = require("./Passport").Discord;
-     * const passport = new Passport();
-     * passport.setLoginCallback((req) => console.log("User #" + req.discord.id + " logged in!"))
-     * */
-    setLoginCallback(callback) {
-        this._loginCallback = callback;
-        return this;
-    }
-
-    /**
-     * @param {function} callback
-     *
-     * @description Passport runs it with parameter `Request`
-     * which they can set and change things everytime when
-     * a user logs out.
-     *
-     * @example
-     * const Passport = require("./Passport").Discord;
-     * const passport = new Passport();
-     * passport.setLogoutCallback((req) => console.log("User #" + req.discord.id + " logged out!"))
-     * */
-    setLogoutCallback(callback) {
-        this._logoutCallback = callback;
-        return this;
-    }
-
-    /**
      * @param {{success?: function(accessData: Object, discordData: Object), error?: function(error: string), redirectURL: string}} options
      * @returns {(function(Request, Response): Promise<*|undefined>)|*}
      */
@@ -405,12 +383,12 @@ class DiscordPassport extends Passport {
         redirectURL: "/"
     }) {
         return async (req, res) => {
-            const token = cookie.parse(req.headers.cookie || '')["cli.id.discord"];
-            if(this.getToken(token)) return res.redirect(options.redirectURL);
+            const token = this.cookie.parse(req.headers.cookie || '')["cli.id.discord"];
+            if (this.getToken(token)) return res.redirect(options.redirectURL);
             const code = req.query.code;
             if (!code) return res.redirect(`https://discord.com/api/oauth2/authorize?client_id=${this.clientId}&redirect_uri=${encodeURI(this.callbackURL)}&response_type=code&scope=${this.scopes.join("%20")}`);
             try {
-                const oauthResult = await fetch('https://discord.com/api/oauth2/token', {
+                const oauthResult = await this.fetch('https://discord.com/api/oauth2/token', {
                     method: "POST",
                     body: new URLSearchParams({
                         client_id: this.clientId,
@@ -428,15 +406,15 @@ class DiscordPassport extends Passport {
                  * @type {{token_type, access_token}}
                  */
                 const oauthData = await oauthResult.json();
-                const userData = await (await fetch('https://discord.com/api/users/@me', {
+                const userData = await (await this.fetch('https://discord.com/api/users/@me', {
                     headers: {
                         authorization: `${oauthData.token_type} ${oauthData.access_token}`,
                     },
                 })).json();
                 this.createSession(req, res, userData, options.redirectURL);
-                if(options.success) options.success(oauthData, userData);
+                if (options.success) options.success(oauthData, userData);
             } catch (error) {
-                if(options.error) options.error(error);
+                if (options.error) options.error(error);
             }
         }
     }
@@ -459,16 +437,16 @@ class DiscordPassport extends Passport {
     callback = (req, res, next) => {
         req.discord = {};
         req.discord.isAuthenticated = () => req.discord.authenticated;
-        const token = cookie.parse(req.headers.cookie || '')["cli.id.discord"];
+        const token = this.cookie.parse(req.headers.cookie || '')["cli.id.discord"];
         const data = this.getToken(token);
         if (!data) return next();
         req.discord.token = token;
         req.discord.id = data["discordId"];
         req.discord.authenticated = true;
-        if (this._loginCallback) this._loginCallback(req);
         return next();
     }
 }
+
 DiscordPassport.SCOPES = [
     "identify", "email", "connections", "guilds", "guilds.join", "gdm.join", "rpc",
     "rpc.notifications.read", "rpc.voice.read", "rpc.voice.write", "rpc.activities.write",
@@ -477,6 +455,6 @@ DiscordPassport.SCOPES = [
     "activities.read", "activities.write", "relationships.read"
 ];
 
-module.exports = Passport;
+module.exports.Local = Passport;
 module.exports.Discord = DiscordPassport;
 module.exports.generateToken = generateToken();

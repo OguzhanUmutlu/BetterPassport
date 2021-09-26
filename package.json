@@ -1,26 +1,35 @@
 {
   "name": "better-passport",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Easy and simple passport module for express.js",
   "main": "Passport.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \\\"Error: no tests specified\\\" && exit 1"
   },
   "repository": {
     "type": "git",
     "url": "git://OguzhanUmutlu/BetterPassport"
   },
   "dependencies": {
+    "better-sqlite3": "^7.4.3",
     "cookie": "^0.4.1",
-    "express": "^4.17.1",
-    "node-fetch": "^3.0.0"
+    "node-fetch": "^2.6.5"
+  },
+  "devDependencies": {
+    "better-passport": "^1.0.3",
+    "express": "^4.17.1"
   },
   "keywords": [
     "passport",
     "better",
     "account",
     "register",
-    "login"
+    "login",
+    "discord",
+    "oauth",
+    "oauth2",
+    "logout",
+    "bot"
   ],
   "author": "OguzhanUmutlu",
   "license": "MIT"

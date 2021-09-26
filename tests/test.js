@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express();
-const Passport = require("../Passport").Discord;
-const passport = new Passport({
+const Passport = await import("better-passport");
+const passport = new Passport.Discord({
     config: true,
     configFile: "./discord.json",
     clientId: "123456789012345678",
