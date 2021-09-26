@@ -13,3 +13,4 @@ module.exports = {
         return this.users.filter(user => user.id === id)[0];
     }
 };
+// its just for example*
