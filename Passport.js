@@ -252,15 +252,12 @@ class Passport {
         req.user.isAuthenticated = () => req.user.authenticated;
         const token = this.cookie.parse(req.headers.cookie || '')["cli.id"];
         const data = this.getToken(token);
-        console.log(data)
         if (!data) {
-            console.log(req)
             return next();
         }
         req.user.token = token;
         req.user.id = data["data"].id;
         req.user.authenticated = true;
-        console.log(req.user)
         if (this._userCallback) req.user.data = this._userCallback(req.user.id);
         return next();
     }

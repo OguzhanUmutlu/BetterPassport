@@ -1,6 +1,6 @@
 {
   "name": "better-passport",
-  "version": "1.0.3",
+  "version": "1.0.6",
   "description": "Easy and simple passport module for express.js",
   "main": "Passport.js",
   "scripts": {
