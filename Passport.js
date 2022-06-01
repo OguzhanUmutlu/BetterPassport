@@ -110,8 +110,7 @@ class Passport {
      */
     removeToken(token) {
         if(this._sqlite) {
-            if(this.getToken(token)) this.removeToken(token);
-            this._sqlite.prepare(`DELETE FROM tokens WHERE token = ?`).run(token);
+            if(this.getToken(token)) this._sqlite.prepare(`DELETE FROM tokens WHERE token = ?`).run(token);
             return this;
         }
         delete this._json[token];
@@ -254,9 +253,7 @@ class Passport {
         req.user.isAuthenticated = () => req.user.authenticated;
         const token = this.cookie.parse(req.headers.cookie || '')["cli.id"];
         const data = this.getToken(token);
-        if (!data) {
-            return next();
-        }
+        if (!data) return next();
         req.user.token = token;
         req.user.id = data["data"].id;
         req.user.authenticated = true;
@@ -317,9 +314,7 @@ class DiscordPassport extends Passport {
      */
     createSession(req, res, data, redirectURL = "/") {
         let token;
-        while (!token || this.getToken(token)) {
-            token = this.generateToken();
-        }
+        while (!token || this.getToken(token)) token = this.generateToken();
         this.setToken(token, {token, data});
         this.setTokenCookie(req, res, "cli.id.discord", token, redirectURL);
         return this;
@@ -387,7 +382,10 @@ class DiscordPassport extends Passport {
             const code = req.query.code;
             if (!code) return res.redirect(`https://discord.com/api/oauth2/authorize?client_id=${this.clientId}&redirect_uri=${encodeURI(this.callbackURL)}&response_type=code&scope=${this.scopes.join("%20")}`);
             try {
-                const oauthResult = await this.fetch('https://discord.com/api/oauth2/token', {
+                /**
+                 * @type {{token_type, access_token}}
+                 */
+                const oauthData = await (await this.fetch('https://discord.com/api/oauth2/token', {
                     method: "POST",
                     body: new URLSearchParams({
                         client_id: this.clientId,
@@ -400,12 +398,8 @@ class DiscordPassport extends Passport {
                     headers: {
                         "Content-Type": "application/x-www-form-urlencoded",
                     },
-                });
-                /**
-                 * @type {{token_type, access_token}}
-                 */
-                const oauthData = await oauthResult.json();
-                const userData = await (await this.fetch('https://discord.com/api/users/@me', {
+                })).json();
+                const userData = await (await this.fetch("https://discord.com/api/users/@me", {
                     headers: {
                         authorization: `${oauthData.token_type} ${oauthData.access_token}`,
                     },
