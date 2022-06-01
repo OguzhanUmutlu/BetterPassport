@@ -162,7 +162,9 @@ class Passport {
     setTokenCookie(req, res, sub, token, redirect = "/") {
         res.setHeader('Set-Cookie', this.cookie.serialize(sub, token, {
             httpOnly: true,
-            maxAge: 60 * 60 * 24 * 7
+            maxAge: 60 * 60 * 24 * 7,
+            domain: req.hostname,
+            path: "/"
         }));
         res.statusCode = 302;
         res.setHeader('Location', redirect);
