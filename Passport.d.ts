@@ -75,7 +75,7 @@ export class Discord extends Passport<Object, string, DiscordPassportOptions> {
 
     createSession(request: Request, response: Response, data: Object, redirectURL?: string): this;
 
-    createLoginCallback(options?: { success: Function, error: Function, redirectURL?: string })
+    createLoginCallback(options?: { success: Function, error: Function, redirectURL?: string }): (request: Request, response: Response) => void;
 }
 
 export function generateToken(): string;
