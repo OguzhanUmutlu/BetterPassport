@@ -1,6 +1,6 @@
 {
   "name": "better-passport",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "Easy and simple passport module for express.js",
   "main": "Passport.js",
   "scripts": {
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://OguzhanUmutlu/BetterPassport"
+    "url": "https://github.com/OguzhanUmutlu/BetterPassport"
   },
   "dependencies": {
     "better-sqlite3": "^7.4.3",

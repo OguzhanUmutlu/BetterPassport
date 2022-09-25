@@ -36,18 +36,28 @@ class Passport {
                     this._sqlite = require("better-sqlite3")(this._configFile);
                     this._sqlite.exec(`CREATE TABLE IF NOT EXISTS tokens
                                        (
-                                           token TEXT PRIMARY KEY NOT NULL,
-                                           data  TEXT             NOT NULL
+                                           token
+                                           TEXT
+                                           PRIMARY
+                                           KEY
+                                           NOT
+                                           NULL,
+                                           data
+                                           TEXT
+                                           NOT
+                                           NULL
                                        )`);
                     break;
             }
         }
+        return this;
     }
 
     getTokens() {
-        if(this._sqlite) {
+        if (this._sqlite) {
             const res = {};
-            this._sqlite.prepare(`SELECT * FROM tokens`).all().forEach(row => res[row.token] = {
+            this._sqlite.prepare(`SELECT *
+                                  FROM tokens`).all().forEach(row => res[row.token] = {
                 token: row.token,
                 data: JSON.parse(row.data)
             });
@@ -62,6 +72,7 @@ class Passport {
     save() {
         if (!this._config || this._sqlite) return this;
         this.fs.writeFileSync(this._configFile, JSON.stringify(this.getTokens()));
+        return this;
     }
 
     /**
@@ -93,9 +104,10 @@ class Passport {
      * @internal - This is an internal function.
      */
     setToken(token, value) {
-        if(this._sqlite) {
-            if(this.getToken(token)) this.removeToken(token);
-            this._sqlite.prepare(`INSERT INTO tokens (token, data) VALUES (?, ?)`).run(token, JSON.stringify(value));
+        if (this._sqlite) {
+            if (this.getToken(token)) this.removeToken(token);
+            this._sqlite.prepare(`INSERT INTO tokens (token, data)
+                                  VALUES (?, ?)`).run(token, JSON.stringify(value));
             return this;
         }
         this._json[token] = value;
@@ -109,8 +121,10 @@ class Passport {
      * @internal - This is an internal function.
      */
     removeToken(token) {
-        if(this._sqlite) {
-            if(this.getToken(token)) this._sqlite.prepare(`DELETE FROM tokens WHERE token = ?`).run(token);
+        if (this._sqlite) {
+            if (this.getToken(token)) this._sqlite.prepare(`DELETE
+                                                            FROM tokens
+                                                            WHERE token = ?`).run(token);
             return this;
         }
         delete this._json[token];
@@ -154,8 +168,7 @@ class Passport {
             token = generateToken();
         }
         this.setToken(token, {token, id: userId});
-        this.setTokenCookie(req, res, "cli.id", token, redirect);
-        return this;
+        return this.setTokenCookie(req, res, "cli.id", token, redirect);
     }
 
     setTokenCookie(req, res, sub, token, redirect = "/") {
@@ -267,6 +280,9 @@ class Passport {
     generateToken = generateToken;
 }
 
+class LocalPassport extends Passport {
+}
+
 class DiscordPassport extends Passport {
 
     /**
@@ -294,9 +310,10 @@ class DiscordPassport extends Passport {
      * @internal - This is an internal function.
      */
     setToken(token, value) {
-        if(this._sqlite) {
-            if(this.getToken(token)) this.removeToken(token);
-            this._sqlite.prepare(`INSERT INTO tokens (token, data) VALUES (?, ?)`).run(token, JSON.stringify(value));
+        if (this._sqlite) {
+            if (this.getToken(token)) this.removeToken(token);
+            this._sqlite.prepare(`INSERT INTO tokens (token, data)
+                                  VALUES (?, ?)`).run(token, JSON.stringify(value));
             return this;
         }
         this._json[token] = value;
@@ -448,6 +465,7 @@ DiscordPassport.SCOPES = [
     "activities.read", "activities.write", "relationships.read"
 ];
 
-module.exports.Local = Passport;
+module.exports.Passport = Passport;
+module.exports.Local = LocalPassport;
 module.exports.Discord = DiscordPassport;
-module.exports.generateToken = generateToken();
+module.exports.generateToken = generateToken;
