@@ -8,7 +8,12 @@ type ScopeList = [
     "activities.read", "activities.write", "relationships.read"
 ];
 
-type DiscordScope = keyof ScopeList;
+type DiscordScope =
+    "identify" | "email" | "connections" | "guilds" | "guilds.join" | "gdm.join" | "rpc" |
+    "rpc.notifications.read" | "rpc.voice.read" | "rpc.voice.write" | "rpc.activities.write" | "bot" |
+    "webhook.incoming" | "messages.read" | "applications.builds.upload" | "applications.builds.read" |
+    "applications.commands" | "applications.store.update" | "applications.entitlements" | "activities.read" |
+    "activities.write" | "relationships.read";
 
 type LocalPassportOptions = {
     config: boolean,
