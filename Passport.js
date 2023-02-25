@@ -1,5 +1,8 @@
 const randoms = "abcdefghijklmnoprstuvyzqwx!'^+%&/()=?_1234567890".split("");
 const generateToken = () => " ".repeat(50).toString().split("").map(() => randoms[Math.floor(Math.random() * randoms.length)]).join("");
+const fs = require("fs");
+const fetch = require("node-fetch");
+const cookie = require("cookie");
 
 class Passport {
     /**
@@ -19,33 +22,22 @@ class Passport {
     }
 
     async init(options) {
-        this.fs = await import("fs");
-        this.fetch = await import("node-fetch");
-        this.cookie = await import("cookie");
         this._config = options.config;
         this._configFile = options.configFile;
         this._configType = options.configType || "json";
         if (this._config) {
             switch (this._configType) {
                 case "json":
-                    if (!this.fs.existsSync(this._configFile)) this.fs.writeFileSync(this._configFile, "{}");
-                    this._json = JSON.parse(this.fs.readFileSync(this._configFile).toString());
+                    if (!fs.existsSync(this._configFile)) fs.writeFileSync(this._configFile, "{}");
+                    this._json = JSON.parse(fs.readFileSync(this._configFile).toString());
                     break;
                 case "sqlite":
                 case "sql":
                     this._sqlite = require("better-sqlite3")(this._configFile);
                     this._sqlite.exec(`CREATE TABLE IF NOT EXISTS tokens
                                        (
-                                           token
-                                           TEXT
-                                           PRIMARY
-                                           KEY
-                                           NOT
-                                           NULL,
-                                           data
-                                           TEXT
-                                           NOT
-                                           NULL
+                                           token TEXT PRIMARY KEY NOT NULL,
+                                           data TEXT NOT NULL
                                        )`);
                     break;
             }
@@ -71,7 +63,7 @@ class Passport {
      */
     save() {
         if (!this._config || this._sqlite) return this;
-        this.fs.writeFileSync(this._configFile, JSON.stringify(this.getTokens()));
+        fs.writeFileSync(this._configFile, JSON.stringify(this.getTokens()));
         return this;
     }
 
@@ -172,14 +164,14 @@ class Passport {
     }
 
     setTokenCookie(req, res, sub, token, redirect = "/") {
-        res.setHeader('Set-Cookie', this.cookie.serialize(sub, token, {
+        res.setHeader("Set-Cookie", cookie.serialize(sub, token, {
             httpOnly: true,
             maxAge: 60 * 60 * 24 * 7,
             domain: req.hostname,
             path: "/"
         }));
         res.statusCode = 302;
-        res.setHeader('Location', redirect);
+        res.setHeader("Location", redirect);
         res.end();
         return this;
     }
@@ -264,7 +256,7 @@ class Passport {
     callback = (req, res, next) => {
         req.user = {};
         req.user.isAuthenticated = () => req.user.authenticated;
-        const token = this.cookie.parse(req.headers.cookie || '')["cli.id"];
+        const token = cookie.parse(req.headers.cookie || '')["cli.id"];
         const data = this.getToken(token);
         if (!data) return next();
         req.user.token = token;
@@ -394,7 +386,7 @@ class DiscordPassport extends Passport {
         redirectURL: "/"
     }) {
         return async (req, res) => {
-            const token = this.cookie.parse(req.headers.cookie || '')["cli.id.discord"];
+            const token = cookie.parse(req.headers.cookie || '')["cli.id.discord"];
             if (this.getToken(token)) return res.redirect(options.redirectURL);
             const code = req.query.code;
             if (!code) return res.redirect(`https://discord.com/api/oauth2/authorize?client_id=${this.clientId}&redirect_uri=${encodeURI(this.callbackURL)}&response_type=code&scope=${this.scopes.join("%20")}`);
@@ -402,7 +394,7 @@ class DiscordPassport extends Passport {
                 /**
                  * @type {{token_type, access_token}}
                  */
-                const oauthData = await (await this.fetch('https://discord.com/api/oauth2/token', {
+                const oauthData = await (await fetch('https://discord.com/api/oauth2/token', {
                     method: "POST",
                     body: new URLSearchParams({
                         client_id: this.clientId,
@@ -416,7 +408,7 @@ class DiscordPassport extends Passport {
                         "Content-Type": "application/x-www-form-urlencoded",
                     },
                 })).json();
-                const userData = await (await this.fetch("https://discord.com/api/users/@me", {
+                const userData = await (await fetch("https://discord.com/api/users/@me", {
                     headers: {
                         authorization: `${oauthData.token_type} ${oauthData.access_token}`,
                     },
@@ -447,7 +439,7 @@ class DiscordPassport extends Passport {
     callback = (req, res, next) => {
         req.discord = {};
         req.discord.isAuthenticated = () => req.discord.authenticated;
-        const token = this.cookie.parse(req.headers.cookie || '')["cli.id.discord"];
+        const token = cookie.parse(req.headers.cookie || '')["cli.id.discord"];
         const data = this.getToken(token);
         if (!data) return next();
         req.discord.token = token;
