@@ -16,9 +16,10 @@ type DiscordScope =
     "activities.write" | "relationships.read";
 
 type LocalPassportOptions = {
-    config: boolean,
-    configFile: string,
-    configType: "sqlite" | "json"
+    config?: boolean,
+    configFile?: string,
+    configType?: "sqlite" | "json",
+    httpOnly?: boolean
 };
 
 type DiscordPassportOptions = LocalPassportOptions & {

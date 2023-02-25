@@ -25,6 +25,7 @@ class Passport {
         this._config = options.config;
         this._configFile = options.configFile;
         this._configType = options.configType || "json";
+        this._httpOnly = options.httpOnly ?? true;
         if (this._config) {
             switch (this._configType) {
                 case "json":
@@ -165,7 +166,7 @@ class Passport {
 
     setTokenCookie(req, res, sub, token, redirect = "/") {
         res.setHeader("Set-Cookie", cookie.serialize(sub, token, {
-            httpOnly: true,
+            httpOnly: this.httpOnly,
             maxAge: 60 * 60 * 24 * 7,
             domain: req.hostname,
             path: "/"
@@ -276,10 +277,6 @@ class LocalPassport extends Passport {
 }
 
 class DiscordPassport extends Passport {
-
-    /**
-     * @param {{clientId: string, configFile: string, clientSecret: string, callbackURL: string, scopes: string[], config: boolean}} options
-     */
     constructor(options) {
         super(options);
         if (!options.clientId || !options.clientSecret || !options.callbackURL || !options.scopes) throw new Error("You should provide clientId, clientSecret, callbackURL and scopes in options!");
